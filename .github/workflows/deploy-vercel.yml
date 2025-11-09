@@ -6,32 +6,41 @@ on:
       - main
   workflow_dispatch:
 
+# Give the GITHUB_TOKEN the permissions needed to create deployments
+permissions:
+  contents: read
+  deployments: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: 🧾 Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: ⚙️ Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests (optional)
+      - name: 🧪 Run tests (optional)
         run: echo "No tests configured - skipping"
 
-      - name: Deploy to Vercel
+      - name: 🚀 Deploy to Vercel
         uses: BetaHuhn/deploy-to-vercel-action@v1
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}        # built-in token
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}        # your personal Vercel token
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}      # team_... or user_...
+          # required inputs (action expects these names)
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+          # optional flags
           PRODUCTION: true
+          # working_directory: "/"
