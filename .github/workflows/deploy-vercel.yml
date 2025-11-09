@@ -6,7 +6,6 @@ on:
       - main
   workflow_dispatch:
 
-# Give the GITHUB_TOKEN the permissions needed to create deployments
 permissions:
   contents: read
   deployments: write
@@ -19,12 +18,18 @@ jobs:
       - name: 🧾 Checkout code
         uses: actions/checkout@v4
 
+      # Node is needed to install Vercel CLI (the BetaHuhn action calls the 'vercel' binary)
+      - name: 🔧 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
       - name: ⚙️ Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      - name: 📦 Install dependencies
+      - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -32,15 +37,22 @@ jobs:
       - name: 🧪 Run tests (optional)
         run: echo "No tests configured - skipping"
 
+      # Install Vercel CLI globally so the deploy action can call `vercel`
+      - name: 📥 Install Vercel CLI
+        run: |
+          npm install -g vercel@28 || npm install -g vercel
+        # (we pin to a modern major version; fallback to latest if pin fails)
+
       - name: 🚀 Deploy to Vercel
         uses: BetaHuhn/deploy-to-vercel-action@v1
         with:
-          # required inputs (action expects these names)
+          # built-in GitHub token (ensure permissions block above)
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # Vercel credentials (add these to repo secrets)
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-          # optional flags
+          # Deploy to production
           PRODUCTION: true
-          # working_directory: "/"
