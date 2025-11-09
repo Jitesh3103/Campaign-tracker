@@ -1,6 +1,5 @@
-name: 🚀 Deploy to Vercel (target specific project)
+name: 🚀 Deploy to Vercel (single project)
 
-# Run on pushes to main and allow manual triggers
 on:
   push:
     branches:
@@ -17,31 +16,42 @@ jobs:
     environment: production
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node (needed by many vercel actions/cli)
+      - name: Set up Node.js (needed for vercel action/CLI)
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      - name: Set up Python (needed for your build / dependency install)
+      - name: Set up Python (if you need it for build / requirements)
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: Install Python dependencies (if requirements.txt exists)
+      - name: Install Python dependencies (if present)
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      # --- Deploy step: use a verified action that supports explicit project id ---
+      # Optional: install vercel CLI so you can run CLI commands if needed
+      - name: Install Vercel CLI (optional)
+        run: |
+          npm install -g vercel
+
+      # Deploy using a stable vercel action that accepts project id:
       - name: Deploy to Vercel (amondnet/vercel-action)
         uses: amondnet/vercel-action@v41.1.4
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}         # required
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}       # required
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }} # required -> YOUR target project
-          vercel-args: "--prod"                             # deploy to production
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: "--prod"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      # (Optional verification step) Print the deployment URL from the action output
+      - name: Show deployment info (optional)
+        if: success()
+        run: echo "Deployment to Vercel triggered for project ${{ secrets.VERCEL_PROJECT_ID }}"
+
