@@ -2,6 +2,14 @@ import os
 import traceback
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 
+# IMPORTANT: set this early so TLS uses certifi's CA bundle
+try:
+    import certifi
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+    print("Using certifi CA bundle at:", certifi.where())
+except Exception as e:
+    print("Could not load certifi:", e)
+
 try:
     app = Flask(__name__)
 
@@ -9,7 +17,6 @@ try:
     # MONGO URI handling
     # -------------------------
     MONGO_URI = os.environ.get("MONGO_URI")
-    # Allow local dev fallback only when FLASK_ENV=development
     if not MONGO_URI and os.environ.get("FLASK_ENV", "").lower() == "development":
         MONGO_URI = "mongodb://localhost:27017/campaign_db"
 
@@ -40,8 +47,17 @@ try:
             return
 
         try:
+            # ensure certifi is used (again, in case)
+            try:
+                import certifi
+                os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+            except Exception:
+                pass
+
+            # Lazy import to avoid import-time failures
             from flask_pymongo import PyMongo
             mongo = PyMongo(app)
+
             # explicit None check — Database objects don't support truth testing
             if getattr(mongo, "db", None) is None:
                 mongo_init_error = "PyMongo initialized but .db missing"
@@ -82,6 +98,7 @@ try:
             "masked_mongo_uri": masked,
             "mongo_init_ok": mongo is not None,
             "mongo_init_error": mongo_init_error,
+            "ssl_cert_file": os.environ.get("SSL_CERT_FILE")
         }), 200
 
     @app.route('/health')
@@ -220,3 +237,4 @@ except Exception as e:
 # Local dev run
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
+
