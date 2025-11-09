@@ -2,79 +2,97 @@ import os
 import traceback
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 
-# -------------------------
-# Main app wrapper
-# -------------------------
 try:
     app = Flask(__name__)
 
     # -------------------------
     # MONGO URI handling
     # -------------------------
-    # In production (Vercel) set MONGO_URI in Project -> Settings -> Environment Variables
     MONGO_URI = os.environ.get("MONGO_URI")
-
     # Allow local dev fallback only when FLASK_ENV=development
     if not MONGO_URI and os.environ.get("FLASK_ENV", "").lower() == "development":
         MONGO_URI = "mongodb://localhost:27017/campaign_db"
 
-    # Log masked presence so you can verify in Vercel build/runtime logs
     if MONGO_URI:
         masked = (MONGO_URI[:20] + "...") if len(MONGO_URI) > 20 else MONGO_URI
         print(f"🔒 MONGO_URI provided (masked): {masked}")
         app.config["MONGO_URI"] = MONGO_URI
     else:
-        print("⚠️ MONGO_URI not provided. DB operations will fail until you add MONGO_URI env var in Vercel.")
+        print("⚠️ MONGO_URI not provided in environment.")
 
     # -------------------------
-    # Lazy PyMongo initialization
+    # Lazy PyMongo initialization with diagnostics
     # -------------------------
     mongo = None
+    mongo_init_error = None
+    mongo_init_attempted = False
+
+    def try_init_mongo_once():
+        """Attempt to initialize PyMongo once and capture any exception."""
+        global mongo, mongo_init_error, mongo_init_attempted
+        if mongo_init_attempted:
+            return
+        mongo_init_attempted = True
+
+        if not app.config.get("MONGO_URI"):
+            mongo_init_error = "MONGO_URI not set"
+            print("⚠️ try_init_mongo_once: MONGO_URI not set")
+            return
+
+        try:
+            from flask_pymongo import PyMongo
+            mongo = PyMongo(app)
+            if not getattr(mongo, "db", None):
+                mongo_init_error = "PyMongo initialized but .db missing"
+                print("⚠️ PyMongo initialized but .db missing")
+                mongo = None
+            else:
+                print("✅ PyMongo initialized.")
+        except Exception as e:
+            mongo = None
+            mongo_init_error = repr(e)
+            print("⚠️ Exception during PyMongo init:", mongo_init_error)
+            traceback.print_exc()
 
     def get_mongo():
-        """Lazily initialize and return the PyMongo instance, or None on failure or if not configured."""
-        global mongo
-        # if no config, skip initialization
-        if not app.config.get("MONGO_URI"):
-            print("⚠️ get_mongo called but no MONGO_URI in app.config; skipping PyMongo init.")
-            return None
-
-        if mongo is None:
-            try:
-                from flask_pymongo import PyMongo
-                mongo = PyMongo(app)
-                # ensure .db exists after initialization
-                if not getattr(mongo, "db", None):
-                    print("⚠️ PyMongo initialized but no .db attribute present. Check MONGO_URI and requirements.")
-                    return None
-                print("✅ PyMongo initialized.")
-            except Exception as e:
-                print("⚠️ Failed to initialize PyMongo:", e)
-                traceback.print_exc()
-                mongo = None
+        try_init_mongo_once()
         return mongo
 
     def get_collection():
-        """Return the campaigns collection or raise a runtime error explaining the issue."""
         m = get_mongo()
         if not m:
-            raise RuntimeError(
-                "MongoDB is not configured or failed to initialize. "
-                "Set the MONGO_URI environment variable in Vercel (Project → Settings → Environment Variables)."
-            )
+            raise RuntimeError("Mongo not initialized: " + (mongo_init_error or "unknown"))
         return m.db.campaigns
 
     # -------------------------
-    # Routes
+    # Debug and health endpoints
     # -------------------------
+    @app.route('/debug')
+    def debug_info():
+        """Returns masked diagnostics about MONGO_URI and PyMongo init status."""
+        try_init_mongo_once()
+        has_mongo_uri = bool(app.config.get("MONGO_URI"))
+        masked = None
+        if has_mongo_uri:
+            uri = app.config["MONGO_URI"]
+            masked = (uri[:20] + "...") if len(uri) > 20 else uri
+        return jsonify({
+            "has_mongo_uri": has_mongo_uri,
+            "masked_mongo_uri": masked,
+            "mongo_init_ok": mongo is not None,
+            "mongo_init_error": mongo_init_error,
+        }), 200
+
     @app.route('/health')
     def health():
-        """A simple health check not requiring DB."""
+        """Simple health check not requiring DB."""
         return jsonify({"status": "ok"}), 200
 
+    # -------------------------
+    # App routes (guarded)
+    # -------------------------
     @app.route('/')
     def index():
-        """Render index.html or return a friendly message if template fails."""
         try:
             return render_template('index.html')
         except Exception as e:
@@ -84,7 +102,6 @@ try:
 
     @app.route('/campaigns')
     def table():
-        """Show campaigns table (DB required)."""
         try:
             coll = get_collection()
         except Exception as e:
@@ -102,7 +119,6 @@ try:
 
     @app.route('/add', methods=['POST'])
     def add_campaign():
-        """Add a new campaign to the DB."""
         try:
             coll = get_collection()
         except Exception as e:
@@ -130,7 +146,6 @@ try:
 
     @app.route('/delete/<id>', methods=['POST'])
     def delete_campaign(id):
-        """Delete a campaign by ObjectId."""
         try:
             coll = get_collection()
         except Exception as e:
@@ -149,7 +164,6 @@ try:
 
     @app.route('/update/<id>', methods=['POST'])
     def update_campaign(id):
-        """Update a campaign's status by ObjectId."""
         try:
             coll = get_collection()
         except Exception as e:
@@ -172,7 +186,6 @@ try:
 
     @app.route('/report', methods=['GET', 'POST'])
     def report():
-        """Generate a simple report (filter by status)."""
         try:
             coll = get_collection()
         except Exception as e:
@@ -195,17 +208,14 @@ try:
             return jsonify({"error": str(e)}), 500
 
 except Exception as e:
-    # Crashed at import-time: present a simple app showing the startup error
+    # Catch unexpected startup error and show it via a simple app
     print("🔥 Startup error:", e)
     traceback.print_exc()
     app = Flask(__name__)
-
     @app.route("/")
     def startup_error():
         return jsonify({"startup_error": str(e)}), 500
 
-
-# Local dev server only
+# Local dev run
 if __name__ == '__main__':
-    # Only enable debug locally; Vercel runs serverless functions.
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
