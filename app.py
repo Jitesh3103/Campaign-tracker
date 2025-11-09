@@ -42,7 +42,8 @@ try:
         try:
             from flask_pymongo import PyMongo
             mongo = PyMongo(app)
-            if not getattr(mongo, "db", None):
+            # explicit None check — Database objects don't support truth testing
+            if getattr(mongo, "db", None) is None:
                 mongo_init_error = "PyMongo initialized but .db missing"
                 print("⚠️ PyMongo initialized but .db missing")
                 mongo = None
@@ -60,7 +61,7 @@ try:
 
     def get_collection():
         m = get_mongo()
-        if not m:
+        if m is None:
             raise RuntimeError("Mongo not initialized: " + (mongo_init_error or "unknown"))
         return m.db.campaigns
 
