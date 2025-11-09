@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Report</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Campaign Tracker</h1>
+            <nav class="nav-container">
+                <a href="{{ url_for('index') }}" class="nav-link">New Campaign</a>
+            </nav> 
+        </header>
+        <main>
+            <div class="list-container">
+                <h2>Campaigns Report</h2>
+
+                <form action="{{ url_for('report') }}" method="POST" class="filter-form">
+                    <div class="form-group">
+                        <label for="status_filter">Filter by Status:</label>
+                        <select name="status_filter" onchange="this.form.submit()">
+                            <option value="All" {% if current_filter == 'All' %}selected{% endif %}>All Campaigns</option>
+                            <option value="Active" {% if current_filter == 'Active' %}selected{% endif %}>Active</option>
+                            <option value="Paused" {% if current_filter == 'Paused' %}selected{% endif %}>Paused</option>
+                            <option value="Completed" {% if current_filter == 'Completed' %}selected{% endif %}>Completed</option>
+                        </select>
+                    </div>
+                </form>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Campaign Name</th>
+                            <th>Client</th>
+                            <th>Start Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for campaign in campaigns %}
+                        <tr>
+                            <td data-label="Campaign Name">{{ campaign.name }}</td>
+                            <td data-label="Client">{{ campaign.client }}</td>
+                            <td data-label="Start Date">{{ campaign.startDate }}</td>
+                            <td data-label="Status">{{ campaign.status }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

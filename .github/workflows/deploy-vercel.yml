@@ -1,0 +1,37 @@
+name: 🚀 Deploy to Vercel
+
+on:
+  push:
+    branches:
+      - main  # deploy only when pushing to main branch
+  workflow_dispatch: # allow manual trigger from Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🧾 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🧪 Run tests (optional)
+        run: |
+          echo "No tests configured - skipping"
+
+      - name: 🚀 Deploy to Vercel
+        uses: BetaHuhn/deploy-to-vercel-action@v1
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}       # optional
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }} # optional
+          vercel-args: "--prod" # deploy directly to production
