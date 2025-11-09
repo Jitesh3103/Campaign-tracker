@@ -31,7 +31,21 @@ jobs:
       - name: 🚀 Deploy to Vercel
         uses: BetaHuhn/deploy-to-vercel-action@v1
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}       # optional
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }} # optional
-          vercel-args: "--prod" # deploy directly to production
+          # required: Vercel token (create in Vercel account -> Tokens)
+          vercel_token: ${{ secrets.VERCEL_TOKEN }}
+
+          # required for specifying the project/org to deploy (add to repo secrets)
+          vercel_org_id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel_project_id: ${{ secrets.VERCEL_PROJECT_ID }}
+
+          # recommended: pass the built-in GitHub token (some actions expect it)
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+          # optional: if the action/your configuration needs a personal GH PAT, supply it
+          gh_pat: ${{ secrets.GH_PAT }}
+
+          # optional working directory (root by default)
+          working_directory: "/"
+
+          # deploy directly to production
+          production: true
