@@ -1,11 +1,11 @@
-name: 🚀 Deploy to Vercel
+name: 🚀 Deploy to Vercel (target single project)
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
+# Allow the built-in token to create deployments
 permissions:
   contents: read
   deployments: write
@@ -13,46 +13,45 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
-      - name: 🧾 Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Node is needed to install Vercel CLI (the BetaHuhn action calls the 'vercel' binary)
-      - name: 🔧 Set up Node.js
+      - name: Set up Node (needed for many front-end builds / vercel action)
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      - name: ⚙️ Set up Python
+      - name: Set up Python (if your repo needs a python build step)
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      - name: 📦 Install Python dependencies
+      - name: Install Python dependencies (only if needed for build)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: 🧪 Run tests (optional)
-        run: echo "No tests configured - skipping"
-
-      # Install Vercel CLI globally so the deploy action can call `vercel`
-      - name: 📥 Install Vercel CLI
+      - name: Build (optional — if you need a build step)
         run: |
-          npm install -g vercel@28 || npm install -g vercel
-        # (we pin to a modern major version; fallback to latest if pin fails)
+          # add your build commands here if needed, e.g. npm install && npm run build
+          echo "No frontend build configured"
 
-      - name: 🚀 Deploy to Vercel
-        uses: BetaHuhn/deploy-to-vercel-action@v1
+      - name: Deploy to Vercel (official action)
+        uses: vercel/action@v3
         with:
-          # built-in GitHub token (ensure permissions block above)
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # required: Vercel token
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
 
-          # Vercel credentials (add these to repo secrets)
+          # required: make sure these match the exact project you want to update
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+
+          # deploy to production
+          prod: true
+
+        # Optional: if you want to make sure we run only on your repo (not forks)
+        env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-          # Deploy to production
-          PRODUCTION: true
