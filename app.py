@@ -9,7 +9,6 @@ try:
     # -----------------------------
     # MONGO URI handling (secure)
     # -----------------------------
-    # Load from environment. In production (Vercel) you MUST set MONGO_URI in Project > Environment Variables.
     MONGO_URI = os.environ.get("MONGO_URI")
 
     # For local development only: allow fallback when FLASK_ENV=development
@@ -18,7 +17,6 @@ try:
 
     # Log masked presence so you can verify in Vercel build/runtime logs
     if MONGO_URI:
-        # mask everything after first 20 characters for safe logging
         masked = (MONGO_URI[:20] + "...") if len(MONGO_URI) > 20 else MONGO_URI
         print(f"🔒 MONGO_URI provided (masked): {masked}")
         app.config["MONGO_URI"] = MONGO_URI
@@ -26,18 +24,28 @@ try:
         print("⚠️ MONGO_URI not provided. DB operations will fail until you add MONGO_URI env var in Vercel.")
 
     # -----------------------------
-    # Lazy initialize PyMongo
+    # Lazy initialize PyMongo (only when MONGO_URI exists)
     # -----------------------------
     mongo = None
 
     def get_mongo():
-        """Lazily initialize and return the PyMongo instance, or None on failure."""
+        """Lazily initialize and return the PyMongo instance, or None on failure or if no URI."""
         global mongo
+        # Don't even try if we don't have a config
+        if not app.config.get("MONGO_URI"):
+            # Clear explicit message to logs
+            print("⚠️ get_mongo called but no MONGO_URI in app.config; skipping PyMongo init.")
+            return None
+
         if mongo is None:
             try:
                 # import inside function to delay potential import-time issues
                 from flask_pymongo import PyMongo
                 mongo = PyMongo(app)
+                # After init, ensure .db is available
+                if not getattr(mongo, "db", None):
+                    print("⚠️ PyMongo initialized but no .db attribute present. Check MONGO_URI and requirements.")
+                    return None
                 print("✅ PyMongo initialized.")
             except Exception as e:
                 # Log the error and keep mongo as None (so the app can still start)
@@ -50,10 +58,12 @@ try:
         """Return the campaigns collection or raise a clear runtime error."""
         m = get_mongo()
         if not m:
+            # Raise a clear runtime error that your route handlers will catch and report
             raise RuntimeError(
                 "MongoDB is not configured or failed to initialize. "
                 "Set the MONGO_URI environment variable in Vercel (Project → Settings → Environment Variables)."
             )
+        # safe to access m.db now
         return m.db.campaigns
 
     # -----------------------------
